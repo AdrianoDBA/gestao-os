@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Banco de Dados Relacional
+  postgres:
+    image: postgres:15-alpine
+    container_name: gestao_os_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password_db_os_secure_9832}
+      POSTGRES_DB: ${DB_NAME:-gestao_os}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gestao_os_network
+
+  # Armazenamento MinIO S3 (Checklists Fotográficos e Anexos)
+  minio:
+    image: minio/minio
+    container_name: gestao_os_minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-password_minio_s3_secure_123}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - gestao_os_network
+
+  # Backend API (NestJS)
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: gestao_os_api
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-password_db_os_secure_9832}@postgres:5432/${DB_NAME:-gestao_os}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-jwt_secret_key_saas_platform_9843920}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minio_admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-password_minio_s3_secure_123}
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - gestao_os_network
+
+  # Frontend Web (Next.js)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: gestao_os_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://api:3001
+    depends_on:
+      - api
+    networks:
+      - gestao_os_network
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  gestao_os_network:
+    driver: bridge

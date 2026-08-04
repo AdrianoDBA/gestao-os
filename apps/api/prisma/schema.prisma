@@ -1,0 +1,562 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  TECHNICIAN
+  ATTENDANT
+}
+
+enum OrderStatus {
+  PENDING
+  UNDER_ANALYSIS
+  BUDGETED
+  APPROVED
+  REJECTED
+  IN_REPAIR
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MovementType {
+  INPUT
+  OUTPUT
+  ADJUSTMENT
+}
+
+enum TransactionType {
+  REVENUE
+  EXPENSE
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_SLIP
+  OTHER
+}
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  document    String?  // CNPJ / CPF do estabelecimento
+  email       String?
+  phone       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  customers    Customer[]
+  brands       Brand[]
+  deviceModels DeviceModel[]
+  devices      Device[]
+  serviceOrders ServiceOrder[]
+  parts        Part[]
+  suppliers    Supplier[]
+  purchaseOrders PurchaseOrder[]
+  transactions Transaction[]
+  auditLogs    AuditLog[]
+  settings     Setting[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(TECHNICIAN)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedOrders ServiceOrder[] @relation("TechnicianOrders")
+  createdOrders  ServiceOrder[] @relation("CreatedByOrders")
+  diagnostics    Diagnostic[]
+  histories      ServiceOrderHistory[]
+  movements      InventoryMovement[]
+  auditLogs      AuditLog[]
+  partnerProfile PartnerProfile?
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  document  String?  // CPF/CNPJ
+  email     String?
+  phone     String
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices       Device[]
+  serviceOrders ServiceOrder[]
+  transactions  Transaction[]
+
+  @@index([tenantId])
+  @@map("customers")
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deviceModels DeviceModel[]
+  devices      Device[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("brands")
+}
+
+model DeviceModel {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name      String
+  category  String   @default("Celular") // Categoria do aparelho (Celular, Notebook, etc.)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  devices Device[]
+  parts   Part[]
+
+  @@unique([tenantId, brandId, name])
+  @@index([tenantId])
+  @@map("device_models")
+}
+
+model Device {
+  id            String      @id @default(uuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  brandId       String
+  brand         Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  deviceModelId String
+  deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id], onDelete: Cascade)
+  serialNumber  String?     // Número de série
+  imei          String?     // IMEI (para celulares)
+  password      String?     // Senha/Padrão de desbloqueio
+  color         String?
+  physicalState String?     // Estado físico (arranhões, tela quebrada, etc)
+  accessories   String?     // Acessórios entregues junto (carregador, capa)
+  observations  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  serviceOrders ServiceOrder[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("devices")
+}
+
+model ServiceOrder {
+  id             String      @id @default(uuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deviceId       String
+  device         Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  technicianId   String?     // Técnico responsável
+  technician     User?       @relation("TechnicianOrders", fields: [technicianId], references: [id])
+  createdById    String      // Quem abriu a OS
+  createdBy      User        @relation("CreatedByOrders", fields: [createdById], references: [id])
+  
+  number         Int         @default(autoincrement()) // Número sequencial amigável
+  status         OrderStatus @default(PENDING)
+  priority       OrderPriority @default(MEDIUM)
+  reportedDefect String      // Defeito relatado pelo cliente
+  accessories    String?     // Acessórios deixados (carregador, capa, etc)
+  checklist      Json?       // Checklist de testes em formato JSON (Wi-Fi, Câmera, etc)
+  totalAmount    Decimal     @default(0.0) @db.Decimal(10, 2)
+  laborAmount    Decimal     @default(0.0) @db.Decimal(10, 2)
+  partsAmount    Decimal     @default(0.0) @db.Decimal(10, 2)
+  notes          String?     // Observações internas
+  
+  entryDate      DateTime    @default(now())
+  exitDate       DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  diagnostics  Diagnostic[]
+  histories    ServiceOrderHistory[]
+  warranties   Warranty[]
+  attachments  Attachment[]
+  transactions Transaction[]
+  partsUsed    ServiceOrderPart[]
+  servicesUsed ServiceOrderServiceItem[]
+
+  @@unique([tenantId, number]) // Número único por assistência técnica
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("service_orders")
+}
+
+model ServiceOrderServiceItem {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  description    String       // Descrição do serviço prestado (ex: Solda de CI, Desoxidação)
+  amount         Decimal      @db.Decimal(10, 2)
+  createdAt      DateTime     @default(now())
+
+  @@map("service_order_services")
+}
+
+model Diagnostic {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  technicianId   String
+  technician     User         @relation(fields: [technicianId], references: [id])
+  
+  technicalReport String      // Laudo técnico
+  solutionProposed String?    // Solução proposta
+  isApproved     Boolean?     // Aprovado pelo cliente? null=pendente
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  attachments Attachment[]
+
+  @@map("diagnostics")
+}
+
+model ServiceOrderHistory {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  
+  fromStatus     OrderStatus
+  toStatus       OrderStatus
+  changedAt      DateTime     @default(now())
+  observation    String?
+
+  @@map("service_order_histories")
+}
+
+model Warranty {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  
+  termDays       Int          // Dias de garantia (ex: 90)
+  startDate      DateTime
+  endDate        DateTime
+  conditions     String?      // Termos e condições da garantia
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("warranties")
+}
+
+model Attachment {
+  id             String        @id @default(uuid())
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  diagnosticId   String?
+  diagnostic     Diagnostic?   @relation(fields: [diagnosticId], references: [id], onDelete: Cascade)
+  
+  name           String        // Nome do arquivo original
+  key            String        // Chave do arquivo no MinIO (S3 path)
+  mimeType       String
+  size           Int           // Tamanho em bytes
+  isPhoto        Boolean       @default(false) // Diferencia foto de anexo genérico
+  uploadedAt     DateTime      @default(now())
+
+  @@map("attachments")
+}
+
+model Part {
+  id            String       @id @default(uuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deviceModelId String?      // Compatibilidade específica (opcional)
+  deviceModel   DeviceModel? @relation(fields: [deviceModelId], references: [id])
+  
+  name          String
+  sku           String?      // Código único de estoque (interno)
+  barcode       String?      // Código de barras físico (EAN, etc)
+  description   String?
+  salePrice     Decimal      @db.Decimal(10, 2)
+  costPrice     Decimal      @db.Decimal(10, 2)
+  minStock      Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  inventory         Inventory?
+  movements         InventoryMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+  serviceOrdersUsed ServiceOrderPart[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
+  @@map("parts")
+}
+
+model Inventory {
+  id        String   @id @default(uuid())
+  partId    String   @unique
+  part      Part     @relation(fields: [partId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(0)
+  location  String?  // Gaveta A1, Prateleira B, etc.
+  updatedAt DateTime @updatedAt
+
+  @@map("inventories")
+}
+
+model InventoryMovement {
+  id        String       @id @default(uuid())
+  partId    String
+  part      Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  
+  type      MovementType
+  quantity  Int
+  reason    String       // Ex: Venda na OS #12, Compra, Ajuste manual
+  createdAt DateTime     @default(now())
+
+  @@map("inventory_movements")
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  document  String?  // CNPJ / CPF
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  transactions   Transaction[]
+
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  number      Int      @default(autoincrement())
+  totalAmount Decimal  @db.Decimal(10, 2)
+  orderDate   DateTime @default(now())
+  deliveryDate DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items        PurchaseOrderItem[]
+  transactions Transaction[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  partId          String
+  part            Part          @relation(fields: [partId], references: [id], onDelete: Cascade)
+  
+  quantity        Int
+  costPrice       Decimal       @db.Decimal(10, 2)
+
+  @@map("purchase_order_items")
+}
+
+model ServiceOrderPart {
+  id             String       @id @default(uuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  partId         String
+  part           Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
+  
+  quantity       Int
+  priceCharged   Decimal      @db.Decimal(10, 2)
+  createdAt      DateTime     @default(now())
+
+  @@unique([serviceOrderId, partId])
+  @@map("service_order_parts")
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId      String?
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  supplierId      String?
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
+  serviceOrderId  String?
+  serviceOrder    ServiceOrder?     @relation(fields: [serviceOrderId], references: [id])
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
+  
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  amount          Decimal           @db.Decimal(10, 2)
+  description     String
+  dueDate         DateTime
+  paymentDate     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  payments Payment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("transactions")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  transactionId String
+  transaction   Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  paidAt        DateTime      @default(now())
+  notes         String?
+
+  @@map("payments")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  action    String   // Ex: CREATE_SERVICE_ORDER, UPDATE_STOCK
+  entity    String   // Nome da tabela/entidade (ex: service_orders)
+  entityId  String?  // ID do registro alterado
+  oldValue  String?  @db.Text
+  newValue  String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("audit_logs")
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  key       String   // Nome da chave (ex: warranty_terms)
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@map("settings")
+}
+
+model PartnerProfile {
+  id              String          @id @default(uuid())
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio             String?         @db.Text
+  specialties     String[]        // Ex: ["Amplificador Valvulado", "Smartphones", "Microsoldagem"]
+  technologies    String[]        // Ex: ["Valvulado", "Analógico", "SMD", "BGA"]
+  brands          String[]        // Ex: ["Marshall", "Fender", "Apple", "Samsung"]
+  devices         String[]        // Ex: ["Audio", "Smartphone", "Notebook"]
+  
+  city            String
+  state           String
+  latitude        Float?
+  longitude       Float?
+  serviceType     String          // Ex: "PRESENTIAL", "REMOTE", "HYBRID"
+  rating          Float           @default(5.0)
+  
+  reviews         PartnerReview[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("partner_profiles")
+}
+
+model PartnerReview {
+  id               String         @id @default(uuid())
+  partnerProfileId String
+  partnerProfile   PartnerProfile @relation(fields: [partnerProfileId], references: [id], onDelete: Cascade)
+  
+  rating           Int            // Nota de 1 a 5
+  comment          String         @db.Text
+  clientName       String
+  blockchainTx     String?        // ID da transação da Blockchain Polygon L2 / Hyperledger
+  createdAt        DateTime       @default(now())
+
+  @@map("partner_reviews")
+}
+
+model BlockchainLog {
+  id           String   @id @default(uuid())
+  entityName   String   // Ex: ServiceOrder, Transaction
+  entityId     String
+  dataHash     String   // Hash SHA-256 do estado da entidade
+  blockchainTx String   // Transação TxHash na rede pública/privada
+  blockNumber  Int?
+  signedBy     String?  // Nome/Chave pública do técnico assinante
+  createdAt    DateTime @default(now())
+
+  @@map("blockchain_logs")
+}
