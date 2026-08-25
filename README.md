@@ -32,18 +32,41 @@ O **Gestão OS** é uma plataforma monorepo SaaS-Ready inteligente, robusta e es
 
 A instalação foi projetada para ser extremamente simples e funcionar perfeitamente em **Windows**, **Linux** e **macOS** através do Docker.
 
-### Passo 1: Clonar o projeto
+### ⚡ Instalação Rápida em 1 Linha (Recomendado)
+
+Você não precisa baixar nada manualmente. Basta abrir o terminal do seu computador e colar o comando correspondente ao seu sistema operacional:
+
+#### 🍎 macOS e 🐧 Linux (Bash)
 ```bash
-git clone https://github.com/usuario/gestao-os.git
+curl -sSL https://raw.githubusercontent.com/AdrianoDBA/gestao-os/main/install.sh | bash
+```
+
+#### 🪟 Windows (PowerShell)
+*Abra o PowerShell no Windows e execute:*
+```powershell
+iwr -useb https://raw.githubusercontent.com/AdrianoDBA/gestao-os/main/install.ps1 | iex
+```
+
+*Nota: Esse instalador automatizado verifica a presença do Git e do Docker no seu computador, realiza a instalação e ativação automática caso necessário, clona este repositório, configura o arquivo `.env` padrão, executa todos os containers e abre o sistema diretamente no seu navegador padrão.*
+
+---
+
+### 📦 Instalação Manual (Passo a Passo)
+
+Caso prefira fazer a instalação manual tradicional:
+
+#### Passo 1: Clonar o projeto
+```bash
+git clone https://github.com/AdrianoDBA/gestao-os.git
 cd gestao-os
 ```
 
-### Passo 2: Iniciar a aplicação
+#### Passo 2: Iniciar a aplicação
 ```bash
 docker compose up -d
 ```
 
-Este único comando irá:
+Este comando irá:
 1. Baixar as imagens e inicializar todos os containers (`Postgres`, `MinIO`, `NestJS API` e `Next.js Frontend`).
 2. Criar automaticamente o banco de dados e aplicar as migrations do Prisma.
 3. Disponibilizar a aplicação nas portas padrões.
