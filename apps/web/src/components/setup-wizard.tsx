@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { Shield, Sparkles, Building2, User, Settings2, ArrowRight, CheckCircle2, Key } from "lucide-react"
-import { activateLicense, generateLicenseKey, validateLicenseKey } from "@/lib/license-service"
+import { activateLicense, validateLicenseKey, getActiveLicense } from "@/lib/license-service"
 
 interface SetupWizardProps {
   onComplete: () => void
@@ -73,11 +73,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       }
       activateLicense(licenseKey.trim(), companyName)
     } else {
-      const trial = generateLicenseKey(companyName, "TRIAL", 15)
-      localStorage.setItem("gestao_os_license_key", trial.key)
       localStorage.setItem("gestao_os_license_client", companyName)
-      localStorage.setItem("gestao_os_license_issued", new Date().toISOString())
-      localStorage.setItem("gestao_os_last_clock", String(Date.now()))
+      getActiveLicense()
     }
 
     // 1. Salvar configurações do sistema

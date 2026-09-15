@@ -30,7 +30,10 @@ import {
   ShieldAlert,
   CheckCircle2,
   MessageSquare,
-  Smartphone
+  Smartphone,
+  Check,
+  Mail,
+  Copy
 } from "lucide-react"
 
 import { SetupWizard } from "./setup-wizard"
@@ -50,6 +53,8 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false)
   const [licenseInputKey, setLicenseInputKey] = useState("")
   const [licenseMsg, setLicenseMsg] = useState<{ text: string; isError: boolean } | null>(null)
+  const [copiedLockCode, setCopiedLockCode] = useState(false)
+  const [copiedModalCode, setCopiedModalCode] = useState(false)
 
   // Estados de PWA
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -198,10 +203,59 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
             </p>
           </div>
 
-          {/* Formulário de Ativação de Chave */}
+          {/* Código de Solicitação da Máquina do Cliente */}
+          <div className="space-y-3 bg-zinc-950/70 p-4 rounded-xl border border-zinc-800/80 text-left">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] uppercase font-bold text-zinc-400">Código de Solicitação Desta Máquina:</span>
+              <span className="text-[10px] font-mono text-zinc-500">ID: {license.machineId}</span>
+            </div>
+            <div className="flex gap-2 items-center">
+              <code className="flex-1 text-xs font-mono font-bold text-white bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-700/70 break-all select-all">
+                {license.requestCode}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(license.requestCode)
+                  setCopiedLockCode(true)
+                  setTimeout(() => setCopiedLockCode(false), 2000)
+                }}
+                className="h-9 font-bold shrink-0 gap-1.5 border-zinc-700 hover:bg-zinc-800"
+              >
+                {copiedLockCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-blue-400" />}
+                {copiedLockCode ? "Copiado" : "Copiar"}
+              </Button>
+            </div>
+
+            {/* Ações de Envio ao Suporte do Adriano */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <a
+                href={`mailto:adrianodba@gmail.com?subject=${encodeURIComponent("Solicitação de Desbloqueio de Licença - " + license.clientName)}&body=${encodeURIComponent(
+                  `Olá Adriano,\n\nMeu sistema Gestão OS está com a licença expirada e solicito a chave de renovação.\n\nOficina: ${license.clientName}\nCódigo de Solicitação: ${license.requestCode}\nID da Máquina: ${license.machineId}\n\nFavor enviar a nova chave para ativação.\n\nObrigado!`
+                )}`}
+                className="py-2 px-3 rounded-lg bg-blue-950/30 border border-blue-800/50 hover:bg-blue-900/40 text-blue-300 font-semibold flex items-center justify-center gap-1.5 transition-colors text-[11px] text-center"
+              >
+                <Mail className="w-3.5 h-3.5 text-blue-400" /> Enviar por E-mail
+              </a>
+
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Olá Adriano! Preciso renovar a licença do Gestão OS.\nOficina: ${license.clientName}\nCódigo de Solicitação: ${license.requestCode}\nID da Máquina: ${license.machineId}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2 px-3 rounded-lg bg-emerald-950/30 border border-emerald-800/50 hover:bg-emerald-900/40 text-emerald-300 font-semibold flex items-center justify-center gap-1.5 transition-colors text-[11px] text-center"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400" /> Enviar pelo WhatsApp
+              </a>
+            </div>
+          </div>
+
+          {/* Formulário de Ativação de Chave Recebida */}
           <div className="space-y-3 bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/60 text-left">
             <label className="text-[11px] font-bold text-zinc-300 block">
-              Inserir Nova Chave de Ativação:
+              Inserir Nova Chave de Ativação Fornecida pelo Adriano:
             </label>
             <input
               type="text"
@@ -224,21 +278,6 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
             >
               <Key className="w-4 h-4" /> Desbloquear Sistema Agora
             </Button>
-          </div>
-
-          {/* Botão de Suporte WhatsApp Direto */}
-          <div className="pt-2 border-t border-zinc-800/60 flex flex-col gap-2">
-            <a
-              href="https://wa.me/5581999999999?text=Ol%C3%A1%2C+preciso+renovar+a+minha+licen%C3%A7a+do+Gest%C3%A3o+OS"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 rounded-xl bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600/30 text-emerald-400 font-bold flex items-center justify-center gap-2 transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" /> Solicitar Renovação Imediata no WhatsApp
-            </a>
-            <p className="text-[10px] text-zinc-500">
-              Seus dados, clientes e ordens de serviço estão 100% seguros no computador local.
-            </p>
           </div>
         </div>
       </div>
@@ -665,14 +704,61 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Formulário para Inserir Nova Chave */}
+            {/* Código de Solicitação da Máquina */}
+            <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] uppercase font-bold text-zinc-400">Código de Solicitação:</span>
+                <span className="text-[9px] font-mono text-zinc-500">ID: {license.machineId}</span>
+              </div>
+              <div className="flex gap-2 items-center">
+                <code className="flex-1 text-[11px] font-mono font-bold text-white bg-zinc-900 px-2.5 py-1.5 rounded border border-zinc-700/70 break-all select-all">
+                  {license.requestCode}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(license.requestCode)
+                    setCopiedModalCode(true)
+                    setTimeout(() => setCopiedModalCode(false), 2000)
+                  }}
+                  className="h-8 text-[11px] font-bold shrink-0 gap-1 border-zinc-700 hover:bg-zinc-800"
+                >
+                  {copiedModalCode ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-blue-400" />}
+                  {copiedModalCode ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <a
+                  href={`mailto:adrianodba@gmail.com?subject=${encodeURIComponent("Solicitação de Renovação de Licença - " + license.clientName)}&body=${encodeURIComponent(
+                    `Olá Adriano,\n\nSolicito a renovação de licença do Gestão OS.\n\nOficina: ${license.clientName}\nCódigo de Solicitação: ${license.requestCode}\nID da Máquina: ${license.machineId}\n\nFavor gerar a chave correspondente.\n\nObrigado!`
+                  )}`}
+                  className="py-1.5 px-2 rounded-lg bg-blue-950/30 border border-blue-800/50 hover:bg-blue-900/40 text-blue-300 font-semibold flex items-center justify-center gap-1.5 transition-colors text-[10px] text-center"
+                >
+                  <Mail className="w-3 h-3 text-blue-400" /> Enviar E-mail
+                </a>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `Olá Adriano! Solicito a renovação da minha licença do Gestão OS.\nOficina: ${license.clientName}\nCódigo de Solicitação: ${license.requestCode}\nID da Máquina: ${license.machineId}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-1.5 px-2 rounded-lg bg-emerald-950/30 border border-emerald-800/50 hover:bg-emerald-900/40 text-emerald-300 font-semibold flex items-center justify-center gap-1.5 transition-colors text-[10px] text-center"
+                >
+                  <Smartphone className="w-3 h-3 text-emerald-400" /> Enviar WhatsApp
+                </a>
+              </div>
+            </div>
+
+            {/* Formulário para Inserir Nova Chave Recebida */}
             <div className="space-y-3">
               <label className="text-[11px] font-bold text-foreground block">
-                Ativar Nova Chave de Renovação:
+                Ativar Nova Chave Fornecida pelo Adriano:
               </label>
               <input
                 type="text"
-                placeholder="Cole sua nova chave aqui..."
+                placeholder="Ex: GOS-PRO-20270915-XXXX-XXXXXXXX"
                 value={licenseInputKey}
                 onChange={(e) => setLicenseInputKey(e.target.value)}
                 className="w-full h-9 px-3 rounded bg-zinc-950 border border-zinc-800 text-foreground font-mono text-xs focus:outline-none focus:border-blue-500 uppercase"
@@ -691,19 +777,6 @@ export function AuthWrapper({ children }: { children: React.ReactNode }) {
               >
                 <Key className="w-4 h-4" /> Aplicar Chave de Licença
               </Button>
-            </div>
-
-            {/* Suporte WhatsApp */}
-            <div className="pt-2 border-t border-zinc-800/60">
-              <a
-                href="https://wa.me/5581999999999?text=Ol%C3%A1%2C+preciso+de+suporte+ou+renova%C3%A7%C3%A3o+no+Gest%C3%A3o+OS"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2 px-3 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-emerald-500/40 text-zinc-300 hover:text-emerald-400 font-medium flex items-center justify-center gap-2 transition-colors text-[11px]"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                Falar com Suporte no WhatsApp
-              </a>
             </div>
           </div>
         </div>

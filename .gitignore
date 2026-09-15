@@ -49,3 +49,10 @@ pnpm-debug.log*
 # Sistema Operacional
 .DS_Store
 Thumbs.db
+
+# Ferramentas exclusivas do Administrador (Adriano - NUNCA sobem pro GitHub)
+scripts/gerar-licenca.js
+scripts/admin-keys/
+admin-secret.key
+*.secret.key
+

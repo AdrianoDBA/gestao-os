@@ -13,11 +13,11 @@ import {
   Settings, Building2, Paintbrush, FileText, Mail, 
   Database, ShieldAlert, History, User, HardDrive, 
   Key, RefreshCw, Download, Upload, Check, AlertTriangle, Eye, Search,
-  Cloud, Clock, CheckCircle2, ShieldCheck, Smartphone, Sparkles
+  Cloud, Clock, CheckCircle2, ShieldCheck, Smartphone, Sparkles, Cpu
 } from "lucide-react"
 import { SystemConfig, SystemLog } from "@/types"
 import { 
-  getActiveLicense, activateLicense, generateLicenseKey, LicenseInfo, LicensePlan 
+  getActiveLicense, activateLicense, LicenseInfo, LicensePlan 
 } from "@/lib/license-service"
 import { 
   getBackupSettings, saveBackupSettings, getStoredAutoBackups, performAutoBackup, 
@@ -111,12 +111,8 @@ export default function SettingsPage() {
   const [licenseKeyInput, setLicenseKeyInput] = useState("")
   const [licenseFeedback, setLicenseFeedback] = useState<{ text: string; isError: boolean } | null>(null)
 
-  // Gerador de Licenças Embutido para o Administrador (Adriano)
-  const [adminGenClient, setAdminGenClient] = useState("")
-  const [adminGenPlan, setAdminGenPlan] = useState<LicensePlan>("PRO")
-  const [adminGenDays, setAdminGenDays] = useState(365)
-  const [adminGenOutput, setAdminGenOutput] = useState("")
-  const [showAdminKeyGenerator, setShowAdminKeyGenerator] = useState(false)
+  // Estado de Cópia do Código de Solicitação da Máquina
+  const [copiedRequestCode, setCopiedRequestCode] = useState(false)
 
   // Estados de Backup
   const [backupSettingsState, setBackupSettingsState] = useState(getBackupSettings())
@@ -1429,114 +1425,80 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Painel do Administrador: Gerador de Licenças (Uso do Adriano) */}
-            <Card className="border-zinc-800 bg-zinc-950/50">
+            {/* Solicitação de Renovação / Registro de Máquina para o Suporte */}
+            <Card className="border-border/40 bg-card/25">
               <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" /> Ferramenta do Vendedor: Gerar Licença para Cliente
-                    </CardTitle>
-                    <CardDescription>
-                      Área exclusiva para você (Adriano) gerar chaves criptográficas para vender aos seus clientes de oficinas.
-                    </CardDescription>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAdminKeyGenerator(!showAdminKeyGenerator)}
-                    className="text-[10px] h-7 border-zinc-700"
-                  >
-                    {showAdminKeyGenerator ? "Ocultar Gerador" : "Abrir Gerador"}
-                  </Button>
-                </div>
+                <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+                  <Cpu className="w-4 h-4 text-blue-400" /> Identificação da Máquina e Solicitação de Chave
+                </CardTitle>
+                <CardDescription>
+                  Cada instalação do Gestão OS é vinculada exclusivamente ao hardware deste computador para garantir total privacidade e segurança dos seus dados locais.
+                </CardDescription>
               </CardHeader>
-
-              {showAdminKeyGenerator && (
-                <CardContent className="space-y-4 text-xs pt-2">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-muted-foreground font-semibold">Nome da Oficina / Cliente</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Tech Cell Assistência"
-                        value={adminGenClient}
-                        onChange={e => setAdminGenClient(e.target.value)}
-                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
-                      />
+              <CardContent className="space-y-4 text-xs">
+                <div className="p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 block">Código de Solicitação Deste Computador:</span>
+                      <p className="text-[11px] text-zinc-500">Envie este código para o suporte do desenvolvedor (Adriano) para receber sua chave de ativação oficial.</p>
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="text-muted-foreground font-semibold">Plano Comercial</label>
-                      <select
-                        value={adminGenPlan}
-                        onChange={e => setAdminGenPlan(e.target.value as LicensePlan)}
-                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
-                      >
-                        <option value="PRO">Plano PRO (Padrão)</option>
-                        <option value="ENTERPRISE">Plano ENTERPRISE (Multi-Usuários)</option>
-                        <option value="TRIAL">Plano TRIAL (Demonstração)</option>
-                        <option value="LIFETIME">Plano VITALÍCIO (Sem Expiração)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-muted-foreground font-semibold">Duração em Dias</label>
-                      <select
-                        value={adminGenDays}
-                        onChange={e => setAdminGenDays(parseInt(e.target.value, 10))}
-                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
-                      >
-                        <option value={15}>15 Dias (Demonstração)</option>
-                        <option value={30}>30 Dias (Mensalidade)</option>
-                        <option value={90}>90 Dias (Trimestral)</option>
-                        <option value={180}>180 Dias (Semestral)</option>
-                        <option value={365}>365 Dias (Anual - 1 Ano)</option>
-                        <option value={36500}>Vitalício (99 Anos)</option>
-                      </select>
-                    </div>
+                    <Badge variant="outline" className="w-fit font-mono text-[10px] border-blue-500/30 text-blue-400">
+                      ID Máquina: {licenseInfo?.machineId || "N/A"}
+                    </Badge>
                   </div>
 
-                  <Button
-                    onClick={() => {
-                      if (!adminGenClient.trim()) {
-                        alert("Digite o nome da oficina ou do cliente para emitir a licença.")
-                        return
-                      }
-                      const generated = generateLicenseKey(adminGenClient, adminGenPlan, adminGenDays)
-                      setAdminGenOutput(generated.key)
-                    }}
-                    className="bg-amber-600 hover:bg-amber-500 text-white font-bold h-8 gap-1.5"
-                  >
-                    <Key className="w-3.5 h-3.5" /> Gerar Chave do Cliente Agora
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                    <code className="flex-1 text-xs font-mono font-bold text-white bg-zinc-900/90 px-3 py-2.5 rounded-lg border border-zinc-700/80 break-all select-all">
+                      {licenseInfo?.requestCode || "REQ-OFICINA-CARREGANDO"}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (licenseInfo?.requestCode) {
+                          navigator.clipboard.writeText(licenseInfo.requestCode)
+                          setCopiedRequestCode(true)
+                          setTimeout(() => setCopiedRequestCode(false), 2000)
+                        }
+                      }}
+                      className="h-10 font-bold shrink-0 gap-1.5 border-zinc-700 hover:bg-zinc-800"
+                    >
+                      {copiedRequestCode ? (
+                        <>
+                          <Check className="w-4 h-4 text-emerald-400" /> Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 text-blue-400" /> Copiar Código
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
-                  {adminGenOutput && (
-                    <div className="p-4 bg-zinc-900 border border-amber-500/40 rounded-xl space-y-2">
-                      <span className="text-[10px] uppercase font-bold text-amber-400">Chave Pronta para Entrega ao Cliente:</span>
-                      <div className="flex gap-2 items-center">
-                        <code className="flex-1 text-[11px] font-mono text-white bg-black p-2.5 rounded border border-zinc-800 break-all select-all">
-                          {adminGenOutput}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText(adminGenOutput)
-                            alert("Chave copiada para a área de transferência! Cole no WhatsApp do cliente.")
-                          }}
-                          className="h-9 font-bold shrink-0 gap-1 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-                        >
-                          Copiar Chave
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-zinc-400">
-                        Envie essa chave para o cliente colar na tela de primeiro acesso ou na tela de renovação.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              )}
+                {/* Opções de Envio Rápido para o Adriano */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <a
+                    href={`mailto:adrianodba@gmail.com?subject=${encodeURIComponent("Solicitação de Licença Gestão OS - " + (licenseInfo?.clientName || "Oficina"))}&body=${encodeURIComponent(
+                      `Olá Adriano,\n\nEstou solicitando a ativação/renovação de licença do sistema Gestão OS.\n\nOficina: ${licenseInfo?.clientName || "Minha Oficina"}\nCódigo de Solicitação: ${licenseInfo?.requestCode}\nID da Máquina: ${licenseInfo?.machineId}\n\nFavor gerar a chave correspondente.\n\nObrigado!`
+                    )}`}
+                    className="p-3 rounded-xl bg-blue-950/20 border border-blue-800/40 hover:bg-blue-900/30 text-blue-300 font-semibold flex items-center justify-center gap-2 transition-colors text-center"
+                  >
+                    <Mail className="w-4 h-4 text-blue-400" /> Enviar Código por E-mail (adrianodba@gmail.com)
+                  </a>
+
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Olá Adriano! Preciso da chave de licença do Gestão OS.\nOficina: ${licenseInfo?.clientName || "Minha Oficina"}\nCódigo de Solicitação: ${licenseInfo?.requestCode}\nID da Máquina: ${licenseInfo?.machineId}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-800/40 hover:bg-emerald-900/30 text-emerald-300 font-semibold flex items-center justify-center gap-2 transition-colors text-center"
+                  >
+                    <Smartphone className="w-4 h-4 text-emerald-400" /> Enviar Código pelo WhatsApp
+                  </a>
+                </div>
+              </CardContent>
             </Card>
           </div>
         )}
