@@ -1,9 +1,18 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "Gestão OS - Assistência Técnica",
   description: "Sistema completo de gestão para assistência técnica de eletrônicos",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg"
+  }
+}
+
+export const viewport: Viewport = {
+  themeColor: "#09090b"
 }
 
 import { AuthWrapper } from "@/components/auth-wrapper"

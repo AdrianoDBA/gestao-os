@@ -103,10 +103,22 @@ As configurações de desenvolvimento e produção são controladas centralizada
 
 ---
 
-## 💾 Backups & Restauração
+## 💾 Backups Automáticos & Google Drive Pessoal
 
-* **Backup Geral**: Acesse a aba **Configurações > Backup & BD** no menu para exportar todas as ordens de serviço, clientes, transações financeiras e estoque do laboratório em um único arquivo compactado `.json`.
-* **Restauração**: Na mesma página, importe o arquivo `.json` gerado para restaurar instantaneamente o estado íntegro do sistema.
+* **Rotina Automática**: O sistema realiza snapshots automáticos a cada 1 hora (ou intervalo configurável) em segundo plano enquanto você atende clientes.
+* **Sincronização em Nuvem (Custo Zero)**: Ao salvar os backups na pasta sincronizada do seu **Google Drive para Computador** (ou OneDrive / Dropbox), todos os arquivos são enviados imediatamente para a sua nuvem pessoal. Se o computador queimar ou for roubado, sua assistência técnica não perde nada.
+* **Restauração Rápida**: Na aba **Configurações > Backup & Google Drive**, você pode restaurar qualquer ponto anterior da sua base com 1 clique.
+
+---
+
+## 🔑 Licenciamento Comercial & Proteção Anti-Fraude
+
+O Gestão OS possui um motor de licenciamento criptográfico offline integrado:
+* **Trial Automático**: Ao instalar pela primeira vez, o cliente ganha 15 dias de teste grátis.
+* **Avisos de Vencimento**: Quando faltarem 7 dias para vencer, o sistema exibe uma barra amarela de alerta com contagem regressiva para renovação no WhatsApp.
+* **Bloqueio ao Expirar**: Após a expiração, a bancada é bloqueada exibindo campo para nova chave e botão direto para o WhatsApp do suporte.
+* **Gerador de Licenças**: O vendedor (você) pode gerar chaves pelo terminal com `node scripts/gerar-licenca.js "Nome da Oficina" PRO 365` ou diretamente na aba **Configurações > Licenciamento Comercial**.
+* Consulte o guia completo de vendas em [KIT-COMERCIAL.md](file:///Users/adrianocme/gestao-os-app-v2/KIT-COMERCIAL.md).
 
 ---
 

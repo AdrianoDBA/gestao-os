@@ -118,19 +118,52 @@ fi
 echo -e "${GREEN}🚀 Inicializando os containers do Gestão OS via Docker Compose...${NC}"
 docker compose up -d
 
+# 8. Cria Atalho na Área de Trabalho / Mesa
+DESKTOP_DIR="$HOME/Desktop"
+if [ ! -d "$DESKTOP_DIR" ]; then
+  DESKTOP_DIR="$HOME/Área de Trabalho"
+fi
+
+if [ -d "$DESKTOP_DIR" ]; then
+  if [ "$OS_TYPE" = "Darwin" ]; then
+    cat << 'EOF' > "$DESKTOP_DIR/Gestão OS.command"
+#!/bin/bash
+open -na "Google Chrome" --args --app=http://localhost:3000 2>/dev/null || open -na "Microsoft Edge" --args --app=http://localhost:3000 2>/dev/null || open http://localhost:3000
+EOF
+    chmod +x "$DESKTOP_DIR/Gestão OS.command"
+    echo -e "${GREEN}🖥️ Atalho 'Gestão OS' criado na sua Mesa (Área de Trabalho)!${NC}"
+  elif [ "$OS_TYPE" = "Linux" ]; then
+    cat << EOF > "$DESKTOP_DIR/gestao-os.desktop"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Gestão OS
+Comment=Sistema de Assistência Técnica
+Exec=google-chrome --app=http://localhost:3000
+Icon=applications-system
+Terminal=false
+StartupNotify=true
+EOF
+    chmod +x "$DESKTOP_DIR/gestao-os.desktop"
+    echo -e "${GREEN}🖥️ Atalho 'Gestão OS' criado na sua Área de Trabalho!${NC}"
+  fi
+fi
+
 echo -e "${BLUE}---------------------------------------------------------${NC}"
 echo -e "🎉 INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
-echo -e "🌐 Acesse no seu navegador em: ${GREEN}http://localhost:3000${NC}"
+echo -e "🌐 Abrindo o Gestão OS em Modo Aplicativo Desktop..."
 echo -e "${BLUE}=========================================================${NC}"
 
-# Abre o navegador automaticamente
+# Abre em modo aplicativo standalone (sem barra de URL de navegador)
 if [ "$OS_TYPE" = "Darwin" ]; then
-  open http://localhost:3000
+  open -na "Google Chrome" --args --app=http://localhost:3000 2>/dev/null || open -na "Microsoft Edge" --args --app=http://localhost:3000 2>/dev/null || open http://localhost:3000
 elif [ "$OS_TYPE" = "Linux" ]; then
-  if command_exists xdg-open; then
+  if command_exists google-chrome; then
+    google-chrome --app=http://localhost:3000 >/dev/null 2>&1 &
+  elif command_exists chromium-browser; then
+    chromium-browser --app=http://localhost:3000 >/dev/null 2>&1 &
+  elif command_exists xdg-open; then
     xdg-open http://localhost:3000
-  elif command_exists gnome-open; then
-    gnome-open http://localhost:3000
   fi
 fi
 

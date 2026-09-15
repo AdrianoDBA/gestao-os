@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import { Shield, Sparkles, Building2, User, Settings2, ArrowRight, CheckCircle2 } from "lucide-react"
+import { Shield, Sparkles, Building2, User, Settings2, ArrowRight, CheckCircle2, Key } from "lucide-react"
+import { activateLicense, generateLicenseKey, validateLicenseKey } from "@/lib/license-service"
 
 interface SetupWizardProps {
   onComplete: () => void
@@ -25,12 +26,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [adminPassword, setAdminPassword] = useState("")
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
 
-  // Etapa 3: Configurações
+  // Etapa 3: Configurações & Licença
   const [language, setLanguage] = useState("pt-BR")
   const [currency, setCurrency] = useState("BRL")
   const [timezone, setTimezone] = useState("GMT-3")
   const [warrantyDays, setWarrantyDays] = useState("90")
   const [osStartNumber, setOsStartNumber] = useState("1000")
+  const [licenseKey, setLicenseKey] = useState("")
 
   const [error, setError] = useState("")
 
@@ -62,6 +64,21 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
     if (isNaN(osNum) || osNum < 1) return setError("A numeração inicial da OS deve ser um número maior que zero.")
     if (isNaN(warDays) || warDays < 0) return setError("A garantia padrão deve ser zero ou um número positivo de dias.")
+
+    // 0. Validação ou Ativação de Licença Comercial
+    if (licenseKey.trim()) {
+      const val = validateLicenseKey(licenseKey.trim())
+      if (!val.isValid) {
+        return setError("Chave de ativação inválida. Verifique o código digitado ou deixe o campo em branco para iniciar com 15 dias de teste grátis.")
+      }
+      activateLicense(licenseKey.trim(), companyName)
+    } else {
+      const trial = generateLicenseKey(companyName, "TRIAL", 15)
+      localStorage.setItem("gestao_os_license_key", trial.key)
+      localStorage.setItem("gestao_os_license_client", companyName)
+      localStorage.setItem("gestao_os_license_issued", new Date().toISOString())
+      localStorage.setItem("gestao_os_last_clock", String(Date.now()))
+    }
 
     // 1. Salvar configurações do sistema
     const sysConfig = {
@@ -425,6 +442,22 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     placeholder="1000"
                   />
                   <p className="text-[9px] text-zinc-500 mt-1">A numeração de novas Ordens de Serviço iniciará a partir deste número sequencial.</p>
+                </div>
+
+                <div className="space-y-1.5 col-span-2 pt-2 border-t border-zinc-800/80">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5" /> Chave de Licença Comercial (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={licenseKey}
+                    onChange={e => setLicenseKey(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg bg-black border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase"
+                    placeholder="GOS-PRO-XXXXXXXX-XXXX-XXXXXXXX (Deixe vazio para 15 dias grátis)"
+                  />
+                  <p className="text-[9px] text-zinc-500 mt-1">
+                    Se você já adquiriu sua licença, cole-a aqui. Caso contrário, você terá 15 dias de teste grátis automático.
+                  </p>
                 </div>
               </div>
             </div>

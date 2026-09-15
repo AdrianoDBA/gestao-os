@@ -12,9 +12,17 @@ import { Badge } from "@/components/ui/badge"
 import { 
   Settings, Building2, Paintbrush, FileText, Mail, 
   Database, ShieldAlert, History, User, HardDrive, 
-  Key, RefreshCw, Download, Upload, Check, AlertTriangle, Eye, Search
+  Key, RefreshCw, Download, Upload, Check, AlertTriangle, Eye, Search,
+  Cloud, Clock, CheckCircle2, ShieldCheck, Smartphone, Sparkles
 } from "lucide-react"
 import { SystemConfig, SystemLog } from "@/types"
+import { 
+  getActiveLicense, activateLicense, generateLicenseKey, LicenseInfo, LicensePlan 
+} from "@/lib/license-service"
+import { 
+  getBackupSettings, saveBackupSettings, getStoredAutoBackups, performAutoBackup, 
+  downloadBackupFile, restoreSystemSnapshot, BackupInterval, AutoBackupSnapshot, getIntervalMs 
+} from "@/lib/backup-service"
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<SystemConfig | null>(null)
@@ -98,6 +106,23 @@ export default function SettingsPage() {
   const [saasClientLimit, setSaasClientLimit] = useState<number>(50)
   const [offlineSyncQueue, setOfflineSyncQueue] = useState<number>(0)
 
+  // Estados de Licença e Backup Comercial
+  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null)
+  const [licenseKeyInput, setLicenseKeyInput] = useState("")
+  const [licenseFeedback, setLicenseFeedback] = useState<{ text: string; isError: boolean } | null>(null)
+
+  // Gerador de Licenças Embutido para o Administrador (Adriano)
+  const [adminGenClient, setAdminGenClient] = useState("")
+  const [adminGenPlan, setAdminGenPlan] = useState<LicensePlan>("PRO")
+  const [adminGenDays, setAdminGenDays] = useState(365)
+  const [adminGenOutput, setAdminGenOutput] = useState("")
+  const [showAdminKeyGenerator, setShowAdminKeyGenerator] = useState(false)
+
+  // Estados de Backup
+  const [backupSettingsState, setBackupSettingsState] = useState(getBackupSettings())
+  const [autoBackupsList, setAutoBackupsList] = useState<AutoBackupSnapshot[]>([])
+  const [backupSuccessMsg, setBackupSuccessMsg] = useState("")
+
   // Especialista da Rede (Fase 3/4)
   const [specialistBio, setSpecialistBio] = useState("")
   const [specialistSpecialties, setSpecialistSpecialties] = useState("")
@@ -108,8 +133,10 @@ export default function SettingsPage() {
   const [specialistCity, setSpecialistCity] = useState("")
   const [specialistState, setSpecialistState] = useState("")
 
-
   useEffect(() => {
+    setLicenseInfo(getActiveLicense())
+    setBackupSettingsState(getBackupSettings())
+    setAutoBackupsList(getStoredAutoBackups())
     const loadedConfig = getStoredSystemConfig()
     setConfig(loadedConfig)
     setLogs(getStoredSystemLogs())
@@ -433,11 +460,11 @@ export default function SettingsPage() {
           { id: "os_financial", label: "OS & Financeiro", icon: FileText },
           { id: "notifications", label: "SMTP & Notificações", icon: Mail },
           { id: "documents", label: "Modelos de Documentos", icon: FileText },
-          { id: "backup", label: "Backup & BD", icon: Database },
+          { id: "backup", label: "Backup & Google Drive", icon: Cloud },
           { id: "logs", label: "Auditoria & Logs", icon: History },
           { id: "automations", label: "Automações", icon: RefreshCw },
           { id: "apikeys_webhooks", label: "API & Webhooks", icon: Key },
-          { id: "saas_plan", label: "Plano & SaaS", icon: HardDrive }
+          { id: "saas_plan", label: "Licenciamento Comercial", icon: ShieldCheck }
         ] as const).map(tab => {
           const Icon = tab.icon
           return (
@@ -859,52 +886,217 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {/* ABA 6: Backup & BD */}
+        {/* ABA 6: Backup & Google Drive */}
         {activeTab === "backup" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gestão de Backup & Integridade de Dados</CardTitle>
-              <CardDescription>Exporte a base de dados do laboratório para segurança ou restaure um backup existente.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 text-xs">
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Exportar */}
-                <div className="p-4 border border-border/40 rounded bg-card/25 space-y-3">
-                  <h5 className="font-bold text-foreground flex items-center gap-1.5">
-                    <Download className="w-4 h-4 text-zinc-400" /> Exportação de Backup
-                  </h5>
-                  <p className="text-muted-foreground">Gera um arquivo contendo todas as tabelas (clientes, OS, estoque, transações e configurações).</p>
-                  <Button variant="outline" size="sm" onClick={handleExportBackup} className="w-full gap-1">
-                    Baixar Arquivo .JSON
-                  </Button>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Cloud className="w-4 h-4 text-blue-400" /> Backup Automático & Sincronização em Nuvem
+                    </CardTitle>
+                    <CardDescription>Configure a rotina de backups de hora em hora e garanta que seus dados estejam protegidos no Google Drive.</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Motor Ativo</span>
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-6 text-xs">
+                {backupSuccessMsg && (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-900 rounded-lg text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>{backupSuccessMsg}</span>
+                  </div>
+                )}
 
-                {/* Importar */}
-                <div className="p-4 border border-border/40 rounded bg-card/25 space-y-3">
-                  <h5 className="font-bold text-foreground flex items-center gap-1.5">
-                    <Upload className="w-4 h-4 text-zinc-400" /> Restauração de Banco
-                  </h5>
-                  <p className="text-muted-foreground">Suba um arquivo de backup em formato JSON para sobrescrever a base inteira.</p>
-                  
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleRestoreBackup}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <Button variant="outline" size="sm" className="w-full gap-1 border-dashed border-border hover:border-zinc-500">
-                      Selecionar e Importar
-                    </Button>
+                {/* Configuração de Frequência e Status */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-2">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-400" /> Frequência de Backup Automático
+                    </label>
+                    <select
+                      value={backupSettingsState.interval}
+                      onChange={e => {
+                        const newInterval = e.target.value as BackupInterval
+                        const updated = {
+                          ...backupSettingsState,
+                          interval: newInterval,
+                          nextBackupAt: newInterval === "manual" ? null : new Date(Date.now() + getIntervalMs(newInterval)).toISOString()
+                        }
+                        setBackupSettingsState(updated)
+                        saveBackupSettings(updated)
+                        setBackupSuccessMsg(`Rotina alterada para: ${newInterval === '1h' ? 'A cada 1 hora' : newInterval === '3h' ? 'A cada 3 horas' : newInterval === '6h' ? 'A cada 6 horas' : newInterval === '12h' ? 'A cada 12 horas' : newInterval === '24h' ? 'Diário (24h)' : 'Manual'}`)
+                      }}
+                      className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
+                    >
+                      <option value="1h">⚡ A cada 1 hora (Recomendado)</option>
+                      <option value="3h">A cada 3 horas</option>
+                      <option value="6h">A cada 6 horas</option>
+                      <option value="12h">A cada 12 horas</option>
+                      <option value="24h">Diário (24 horas)</option>
+                      <option value="manual">Apenas Manual</option>
+                    </select>
+                    <p className="text-[9px] text-muted-foreground">O sistema grava snapshots automaticamente em segundo plano enquanto você trabalha.</p>
+                  </div>
+
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Último Backup Realizado</p>
+                    <p className="text-sm font-bold text-foreground">
+                      {backupSettingsState.lastBackupAt ? new Date(backupSettingsState.lastBackupAt).toLocaleString("pt-BR") : "Nenhum ainda"}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">Snapshot íntegro armazenado localmente.</p>
+                  </div>
+
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Próximo Backup Agendado</p>
+                    <p className="text-sm font-bold text-blue-400">
+                      {backupSettingsState.nextBackupAt ? new Date(backupSettingsState.nextBackupAt).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) : "Desativado (Manual)"}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">Executará automaticamente em segundo plano.</p>
                   </div>
                 </div>
 
-              </div>
+                {/* Ações Rápidas */}
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <Button
+                    onClick={() => {
+                      const snap = performAutoBackup("Manual pelo Usuário")
+                      setBackupSettingsState(getBackupSettings())
+                      setAutoBackupsList(getStoredAutoBackups())
+                      setBackupSuccessMsg(`Backup manual gerado com sucesso (${(snap.sizeBytes / 1024).toFixed(1)} KB) com ${snap.recordCounts.orders} OSs e ${snap.recordCounts.customers} clientes!`)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold gap-1.5 h-8"
+                  >
+                    <Database className="w-3.5 h-3.5" /> Executar Backup Agora
+                  </Button>
 
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      downloadBackupFile()
+                      setBackupSuccessMsg("Arquivo .JSON gerado e pronto para salvar na sua pasta do Google Drive!")
+                    }}
+                    className="gap-1.5 h-8 border-border hover:bg-muted/20"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" /> Exportar Arquivo para Google Drive (.JSON)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Como sincronizar com o Google Drive / Nuvem com Custo Zero */}
+            <Card className="border-blue-900/30 bg-blue-950/10">
+              <CardHeader>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                  <Cloud className="w-4 h-4 text-blue-400" /> Como Sincronizar com seu Google Drive Pessoal (Custo Zero)
+                </CardTitle>
+                <CardDescription>
+                  Proteja sua assistência técnica contra queima do computador ou roubo sem pagar nada por servidores em nuvem.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs leading-relaxed text-zinc-300">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1">
+                    <span className="text-blue-400 font-bold text-[11px]">1. Instale o Google Drive</span>
+                    <p className="text-[10px] text-zinc-400">Instale o aplicativo oficial gratuito <strong>Google Drive para Computador</strong> (ou OneDrive / Dropbox) no seu PC ou Mac.</p>
+                  </div>
+                  <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1">
+                    <span className="text-blue-400 font-bold text-[11px]">2. Crie a Pasta de Backups</span>
+                    <p className="text-[10px] text-zinc-400">Crie uma pasta chamada <code>Google Drive/Backups_GestaoOS</code> dentro do seu drive sincronizado.</p>
+                  </div>
+                  <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1">
+                    <span className="text-blue-400 font-bold text-[11px]">3. Sincronização Instantânea</span>
+                    <p className="text-[10px] text-zinc-400">Ao exportar ou direcionar os downloads para lá, o Google Drive envia seus dados para os servidores do Google na mesma hora.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Histórico dos Últimos Backups Automáticos */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <History className="w-4 h-4 text-zinc-400" /> Histórico dos Últimos Snapshots Automáticos
+                </CardTitle>
+                <CardDescription>Restaure o sistema para um ponto anterior no tempo com apenas 1 clique.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs">
+                {autoBackupsList.length === 0 ? (
+                  <p className="text-zinc-500 italic py-4 text-center">Nenhum snapshot automático gerado ainda. Clique em &quot;Executar Backup Agora&quot; acima para criar o primeiro.</p>
+                ) : (
+                  <div className="overflow-x-auto border border-border/40 rounded-xl">
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20">
+                          <th className="py-2.5 px-3 text-muted-foreground">Data/Hora</th>
+                          <th className="py-2.5 px-3 text-muted-foreground">Origem</th>
+                          <th className="py-2.5 px-3 text-muted-foreground">Ordens (OS)</th>
+                          <th className="py-2.5 px-3 text-muted-foreground">Clientes</th>
+                          <th className="py-2.5 px-3 text-muted-foreground">Tamanho</th>
+                          <th className="py-2.5 px-3 text-right text-muted-foreground">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {autoBackupsList.map(snap => (
+                          <tr key={snap.id} className="border-b border-border/20 hover:bg-muted/10">
+                            <td className="py-2.5 px-3 font-semibold text-foreground">
+                              {new Date(snap.timestamp).toLocaleString("pt-BR")}
+                            </td>
+                            <td className="py-2.5 px-3 text-zinc-400">{snap.label}</td>
+                            <td className="py-2.5 px-3 text-foreground">{snap.recordCounts?.orders || 0}</td>
+                            <td className="py-2.5 px-3 text-foreground">{snap.recordCounts?.customers || 0}</td>
+                            <td className="py-2.5 px-3 text-zinc-400 font-mono">{(snap.sizeBytes / 1024).toFixed(1)} KB</td>
+                            <td className="py-2.5 px-3 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Deseja realmente restaurar o backup de ${new Date(snap.timestamp).toLocaleString("pt-BR")}? Os dados atuais serão substituídos.`)) {
+                                    restoreSystemSnapshot(snap.data)
+                                    window.location.reload()
+                                  }
+                                }}
+                                className="h-7 text-[10px] text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
+                              >
+                                Restaurar Snapshot
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Restauração por Arquivo Externo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-zinc-400" /> Restauração a Partir de Arquivo Externo (.JSON)
+                </CardTitle>
+                <CardDescription>Suba um arquivo de backup que você salvou no Google Drive ou pendrive para migrar ou restaurar.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreBackup}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Button variant="outline" size="sm" className="w-full gap-2 border-dashed border-border hover:border-zinc-500 h-12">
+                    <Upload className="w-4 h-4 text-zinc-400" /> Clique aqui para selecionar o arquivo .JSON do seu computador ou Google Drive
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* ABA 7: Auditoria & Logs */}
@@ -1127,75 +1319,226 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* ABA 10: Plano & SaaS */}
+        {/* ABA 10: Licenciamento Comercial */}
         {activeTab === "saas_plan" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Plano, Assinatura & Limites (Preparação SaaS)</CardTitle>
-              <CardDescription>Gerencie o licenciamento multi-tenant da sua empresa e o limite de uso.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 text-xs">
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                <div className="p-4 border border-border/40 rounded bg-card/25 space-y-1">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Plano Atual</p>
-                  <p className="text-base font-bold text-foreground">{saasPlan}</p>
+          <div className="space-y-6">
+            {/* Status da Licença Atual */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-400" /> Licenciamento do Software & Validade
+                    </CardTitle>
+                    <CardDescription>Controle de ativação local, período de suporte e renovação de planos comerciais.</CardDescription>
+                  </div>
+                  {licenseInfo && (
+                    <Badge 
+                      variant="outline" 
+                      className={`text-[10px] font-bold ${
+                        licenseInfo.isExpiringSoon 
+                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' 
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                      }`}
+                    >
+                      {licenseInfo.isExpired ? "EXPIRADA" : licenseInfo.isExpiringSoon ? "EXPIRANDO EM BREVE" : "LICENÇA ATIVA"}
+                    </Badge>
+                  )}
                 </div>
-                <div className="p-4 border border-border/40 rounded bg-card/25 space-y-1">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Clientes Cadastrados</p>
-                  <p className="text-base font-bold text-foreground">12 / {saasClientLimit}</p>
-                </div>
-                <div className="p-4 border border-border/40 rounded bg-card/25 space-y-1">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Fila Offline local</p>
-                  <p className="text-base font-bold text-zinc-400 font-mono">{offlineSyncQueue} pendentes</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent className="space-y-6 text-xs">
+                {licenseFeedback && (
+                  <div className={`p-3 rounded-lg text-xs flex items-center gap-2 ${licenseFeedback.isError ? 'bg-red-950/40 border border-red-900 text-red-300' : 'bg-emerald-950/40 border border-emerald-900 text-emerald-300'}`}>
+                    {licenseFeedback.isError ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                    <span>{licenseFeedback.text}</span>
+                  </div>
+                )}
 
-              <div className="border-t border-border/20 pt-4 flex flex-col md:flex-row gap-4 items-center justify-between p-4 rounded bg-zinc-950/20">
-                <div>
-                  <p className="font-bold text-foreground">Deseja migrar para o Plano Ouro SaaS?</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">O Plano Ouro estende o limite para 500 clientes cadastrados e desbloqueia multi-usuários ilimitados.</p>
-                </div>
-                <Button
-                  onClick={() => {
-                    setSaasPlan("Ouro (Platinum)")
-                    setSaasClientLimit(500)
-                    alert("Upgrade realizado com sucesso! Seus limites corporativos foram redefinidos.")
-                  }}
-                  variant="default"
-                  size="sm"
-                  className="gap-1 font-bold shrink-0"
-                >
-                  Fazer Upgrade p/ Ouro
-                </Button>
-              </div>
-
-              <div className="border-t border-border/20 pt-4 space-y-3">
-                <p className="font-bold text-foreground">Sincronização de Dados & Health Check</p>
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => {
-                      setOfflineSyncQueue(3)
-                      setTimeout(() => {
-                        setOfflineSyncQueue(0)
-                        alert("Sincronização com o cluster principal SaaS finalizada com sucesso!")
-                      }, 1000)
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                  >
-                    Simular Modo Offline & Sync
-                  </Button>
-                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-400">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Servidores operacionais (Ping: 14ms)
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Plano Registrado</p>
+                    <p className="text-base font-bold text-blue-400 uppercase">{licenseInfo?.plan || "TRIAL"}</p>
+                    <p className="text-[9px] text-muted-foreground">Módulos ilimitados liberados</p>
+                  </div>
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Titular / Oficina</p>
+                    <p className="text-base font-bold text-foreground truncate">{licenseInfo?.clientName || "Bancada Local"}</p>
+                    <p className="text-[9px] text-muted-foreground">Instalação local isolada</p>
+                  </div>
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Dias Restantes</p>
+                    <p className={`text-base font-bold ${licenseInfo?.isExpiringSoon ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {licenseInfo?.daysRemaining} dias
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">Contagem regressiva automática</p>
+                  </div>
+                  <div className="p-4 border border-border/40 rounded-xl bg-card/25 space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Validade Até</p>
+                    <p className="text-base font-bold text-foreground">
+                      {licenseInfo?.expiresAt ? new Date(licenseInfo.expiresAt).toLocaleDateString("pt-BR") : "Indeterminada"}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">Data de vencimento oficial</p>
                   </div>
                 </div>
-              </div>
 
-            </CardContent>
-          </Card>
+                <div className="p-4 bg-zinc-950/40 border border-zinc-800/80 rounded-xl space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400">Chave Criptográfica Ativa:</span>
+                  <code className="block text-[11px] font-mono text-zinc-300 bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800 break-all select-all">
+                    {licenseInfo?.key || "Nenhuma chave registrada"}
+                  </code>
+                </div>
+
+                {/* Ativação de Nova Chave */}
+                <div className="border-t border-border/20 pt-4 space-y-3">
+                  <p className="font-bold text-foreground flex items-center gap-1.5">
+                    <Key className="w-4 h-4 text-blue-400" /> Ativar ou Renovar Chave de Licença
+                  </p>
+                  <p className="text-muted-foreground">
+                    Insira a nova chave fornecida pelo suporte comercial para renovar seu período ou migrar para o plano anual/vitalício.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ex: GOS-PRO-20270915-XXXX-XXXXXXXX"
+                      value={licenseKeyInput}
+                      onChange={e => setLicenseKeyInput(e.target.value)}
+                      className="flex-1 h-9 px-3 rounded bg-background border border-border font-mono text-xs focus:outline-none focus:border-blue-500 uppercase"
+                    />
+                    <Button
+                      onClick={() => {
+                        setLicenseFeedback(null)
+                        if (!licenseKeyInput.trim()) {
+                          setLicenseFeedback({ text: "Digite ou cole a chave de licença.", isError: true })
+                          return
+                        }
+                        const res = activateLicense(licenseKeyInput)
+                        if (res.success) {
+                          setLicenseFeedback({ text: res.message, isError: false })
+                          setLicenseInfo(getActiveLicense())
+                          setLicenseKeyInput("")
+                        } else {
+                          setLicenseFeedback({ text: res.message, isError: true })
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 gap-1.5"
+                    >
+                      <Key className="w-3.5 h-3.5" /> Aplicar Chave
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Painel do Administrador: Gerador de Licenças (Uso do Adriano) */}
+            <Card className="border-zinc-800 bg-zinc-950/50">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" /> Ferramenta do Vendedor: Gerar Licença para Cliente
+                    </CardTitle>
+                    <CardDescription>
+                      Área exclusiva para você (Adriano) gerar chaves criptográficas para vender aos seus clientes de oficinas.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdminKeyGenerator(!showAdminKeyGenerator)}
+                    className="text-[10px] h-7 border-zinc-700"
+                  >
+                    {showAdminKeyGenerator ? "Ocultar Gerador" : "Abrir Gerador"}
+                  </Button>
+                </div>
+              </CardHeader>
+
+              {showAdminKeyGenerator && (
+                <CardContent className="space-y-4 text-xs pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-muted-foreground font-semibold">Nome da Oficina / Cliente</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Tech Cell Assistência"
+                        value={adminGenClient}
+                        onChange={e => setAdminGenClient(e.target.value)}
+                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-muted-foreground font-semibold">Plano Comercial</label>
+                      <select
+                        value={adminGenPlan}
+                        onChange={e => setAdminGenPlan(e.target.value as LicensePlan)}
+                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
+                      >
+                        <option value="PRO">Plano PRO (Padrão)</option>
+                        <option value="ENTERPRISE">Plano ENTERPRISE (Multi-Usuários)</option>
+                        <option value="TRIAL">Plano TRIAL (Demonstração)</option>
+                        <option value="LIFETIME">Plano VITALÍCIO (Sem Expiração)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-muted-foreground font-semibold">Duração em Dias</label>
+                      <select
+                        value={adminGenDays}
+                        onChange={e => setAdminGenDays(parseInt(e.target.value, 10))}
+                        className="w-full h-8 px-2 rounded bg-background border border-border text-xs focus:outline-none"
+                      >
+                        <option value={15}>15 Dias (Demonstração)</option>
+                        <option value={30}>30 Dias (Mensalidade)</option>
+                        <option value={90}>90 Dias (Trimestral)</option>
+                        <option value={180}>180 Dias (Semestral)</option>
+                        <option value={365}>365 Dias (Anual - 1 Ano)</option>
+                        <option value={36500}>Vitalício (99 Anos)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (!adminGenClient.trim()) {
+                        alert("Digite o nome da oficina ou do cliente para emitir a licença.")
+                        return
+                      }
+                      const generated = generateLicenseKey(adminGenClient, adminGenPlan, adminGenDays)
+                      setAdminGenOutput(generated.key)
+                    }}
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-bold h-8 gap-1.5"
+                  >
+                    <Key className="w-3.5 h-3.5" /> Gerar Chave do Cliente Agora
+                  </Button>
+
+                  {adminGenOutput && (
+                    <div className="p-4 bg-zinc-900 border border-amber-500/40 rounded-xl space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-amber-400">Chave Pronta para Entrega ao Cliente:</span>
+                      <div className="flex gap-2 items-center">
+                        <code className="flex-1 text-[11px] font-mono text-white bg-black p-2.5 rounded border border-zinc-800 break-all select-all">
+                          {adminGenOutput}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(adminGenOutput)
+                            alert("Chave copiada para a área de transferência! Cole no WhatsApp do cliente.")
+                          }}
+                          className="h-9 font-bold shrink-0 gap-1 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                        >
+                          Copiar Chave
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-zinc-400">
+                        Envie essa chave para o cliente colar na tela de primeiro acesso ou na tela de renovação.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          </div>
         )}
 
 

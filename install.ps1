@@ -1,7 +1,7 @@
 # Script do PowerShell para instalação automática do Gestão OS no Windows
 
 Write-Host "=========================================================" -ForegroundColor Blue
-Write-Host "⚡ INSTALADOR AUTOMÁTICO GESTÃO OS - WINDOWS RELEASE 1.0" -ForegroundColor Green
+Write-Host "⚡ INSTALADOR AUTOMÁTICO GESTÃO OS - WINDOWS RELEASE 2.0" -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Blue
 
 # Função para verificar se um comando existe no sistema
@@ -58,10 +58,33 @@ if (-not (Test-Path ".env")) {
 Write-Host "🚀 Inicializando os containers do Gestão OS via Docker Compose..." -ForegroundColor Green
 docker compose up -d
 
+# 6. Cria Atalho na Área de Trabalho do Windows (Modo Aplicativo Nativo)
+try {
+    $DesktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+    $ShortcutPath = Join-Path $DesktopPath "Gestao OS.lnk"
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+    $Shortcut.TargetPath = "msedge.exe"
+    $Shortcut.Arguments = "--app=http://localhost:3000"
+    $Shortcut.Description = "Gestão OS - Sistema de Assistência Técnica"
+    $Shortcut.Save()
+    Write-Host "🖥️ Atalho 'Gestão OS' criado com sucesso na Área de Trabalho!" -ForegroundColor Green
+} catch {
+    # Ignora se não conseguir criar atalho
+}
+
 Write-Host "---------------------------------------------------------" -ForegroundColor Blue
 Write-Host "🎉 INSTALAÇÃO CONCLUÍDA COM SUCESSO!" -ForegroundColor Green
-Write-Host "🌐 Acesse no seu navegador em: http://localhost:3000" -ForegroundColor Green
+Write-Host "🌐 Abrindo o Gestão OS em Modo de Aplicativo Desktop..." -ForegroundColor Green
 Write-Host "=========================================================" -ForegroundColor Blue
 
-# Abre o navegador automaticamente
-Start-Process "http://localhost:3000"
+# 7. Abre em modo de aplicativo standalone (sem barra de URL de navegador)
+try {
+    Start-Process "msedge.exe" -ArgumentList "--app=http://localhost:3000"
+} catch {
+    try {
+        Start-Process "chrome.exe" -ArgumentList "--app=http://localhost:3000"
+    } catch {
+        Start-Process "http://localhost:3000"
+    }
+}
